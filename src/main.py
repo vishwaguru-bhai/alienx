@@ -33,7 +33,7 @@ if not api_key:
     sys.exit(1)
 
 client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1" if os.getenv("OPENROUTER_API_KEY") else None)
-MODEL = os.getenv("MODEL", "mistralai/mixtral-8x7b-instruct:free")
+MODEL = os.getenv("MODEL", "openrouter/auto")
 
 # ========== AUDIO ==========
 def record_audio(duration=None, fs=16000):
