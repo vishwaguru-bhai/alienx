@@ -186,10 +186,10 @@ def open_application(app_name: str) -> str:
         else:
             subprocess.run(['xdg-open', app_name], check=True)
         logger.info(f"Successfully opened {app_name}")
-        return f"Opening {app_name}."
+        return f"{app_name} खोला जा रहा है।"
     except Exception as e:
         logger.error(f"Failed to open {original} (tried {app_name}): {e}")
-        return f"Sorry, I couldn't open {original}. Please check if it's installed."
+        return f"सॉरी, {original} नहीं खुल रहा। कृपया जांचें कि यह इंस्टॉल है कि नहीं।"
 
 def open_url(url: str) -> str:
     """Open URL in default browser."""
@@ -203,29 +203,31 @@ def open_url(url: str) -> str:
     try:
         logger.info(f"Opening URL: {url}")
         subprocess.run(['open', url] if sys.platform == 'darwin' else ['xdg-open', url], check=True)
-        return f"Opening {url}."
+        return f"{url} खोला जा रहा है।"
     except Exception as e:
         logger.error(f"Failed to open URL {url}: {e}")
-        return f"Failed to open {url}."
+        return f"सॉरी, {url} नहीं खुल रहा।"
 
 def execute_shell(command: str) -> str:
     """Execute a shell command and return output."""
     try:
         result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=10)
         output = result.stdout.strip() or result.stderr.strip()
-        return output if output else "Command executed."
+        if output:
+            return output
+        return "कमांड चलाया गया।"
     except subprocess.TimeoutExpired:
-        return "Command timed out."
+        return "कमांड टाइम आउट हो गया।"
     except Exception as e:
-        return f"Error: {e}"
+        return f"एरर: {e}"
 
 def get_weather(city: str = "Delhi") -> str:
     """Placeholder weather - can integrate real API."""
-    return f"Weather for {city}: 25°C, sunny (sample)."
+    return f"{city} का मौसम: २५°C, धूप (उदाहरण)।"
 
 def tell_time() -> str:
     now = datetime.datetime.now().strftime("%I:%M %p")
-    return f"The time is {now}."
+    return f"अभी समय है {now}"
 
 def list_applications() -> str:
     """List running applications."""
@@ -234,8 +236,8 @@ def list_applications() -> str:
         proc = subprocess.run(['osascript', '-e', script], capture_output=True, text=True)
         if proc.returncode == 0:
             apps = proc.stdout.strip().split(', ')
-            return "Running apps: " + ", ".join(apps[:10])
-    return "Could not fetch apps."
+            return "चल रहे एप्स: " + ", ".join(apps[:10])
+    return "एप्स नहीं मिल रहे।"
 
 def lock_screen() -> str:
     """Lock screen."""
@@ -243,7 +245,7 @@ def lock_screen() -> str:
         subprocess.run(['pmset', 'displaysleepnow'])
     else:
         subprocess.run(['loginctl', 'lock-session'])
-    return "Screen locked."
+    return "स्क्रीिन लॉक हो गई।"
 
 def sleep_computer() -> str:
     """Put computer to sleep."""
@@ -251,10 +253,10 @@ def sleep_computer() -> str:
         subprocess.run(['pmset', 'sleepnow'])
     else:
         subprocess.run(['systemctl', 'suspend'])
-    return "Computer going to sleep."
+    return "कंप्यूटर स्लीप हो रहा है।"
 
 def say_hello() -> str:
-    return "Hello! I'm AlienX, your voice assistant."
+    return "नमस्ते! मैं AlienX हूँ, आपका वॉयस असिस्टेंट।"
 
 def play_music(genre: str = None, artist: str = None) -> str:
     """Play random music via AppleScript (macOS) or generic command."""
@@ -269,37 +271,37 @@ def play_music(genre: str = None, artist: str = None) -> str:
             '''
             result = subprocess.run(['osascript', '-e', script], capture_output=True, text=True, check=True)
             logger.info(f"Music script output: {result.stdout.strip()}")
-            return "Playing random music."
+            return "रैंडम गाना बजा रहा हूँ।"
         else:
             return "Music control not implemented for this OS."
     except subprocess.CalledProcessError as e:
         logger.error(f"AppleScript error: {e.stderr}")
-        return f"Could not play music: {e.stderr}"
+        return f"गाना नहीं बज रहा: {e.stderr}"
     except Exception as e:
         logger.exception("play_music failed")
-        return f"Could not play music: {e}"
+        return f"गाना नहीं बज रहा: {e}"
 
 def pause_music() -> str:
     """Pause music playback."""
     try:
         if sys.platform == 'darwin':
             subprocess.run(['osascript', '-e', 'tell application "Music" to pause'], check=True)
-            return "Music paused."
+            return "म्यूजिक पॉज़ किया गया।"
         else:
             return "Not supported on this OS."
     except Exception as e:
-        return f"Error pausing: {e}"
+        return f"पॉज़ में त्रुटि: {e}"
 
 def next_track() -> str:
     """Skip to next track."""
     try:
         if sys.platform == 'darwin':
             subprocess.run(['osascript', '-e', 'tell application "Music" to next track'], check=True)
-            return "Skipped to next track."
+            return "अगले ट्रैक पर जा रहा हूँ।"
         else:
             return "Not supported on this OS."
     except Exception as e:
-        return f"Error skipping: {e}"
+        return f"नेक्स्ट में त्रुटि: {e}"
 
 # ========== LLM INTENT ==========
 FUNCTIONS = [
