@@ -7,3 +7,6 @@ pydantic>=2.0
 SpeechRecognition>=3.10.0
 pyobjc-framework-Cocoa>=10.0; sys_platform == 'darwin'
 pyobjc-framework-Quartz>=10.0; sys_platform == 'darwin'
+psutil>=5.9.0
+pyautogui>=0.9.54
+requests>=2.31.0

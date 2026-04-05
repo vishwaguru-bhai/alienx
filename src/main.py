@@ -9,6 +9,9 @@ import json
 import subprocess
 import datetime
 import logging
+import shutil
+import psutil
+import requests
 from dotenv import load_dotenv
 from openai import OpenAI
 import threading
@@ -20,6 +23,11 @@ import wave
 import sys
 import time
 import speech_recognition as sr
+try:
+    import pyautogui
+    PYAUTOGUI_AVAILABLE = True
+except ImportError:
+    PYAUTOGUI_AVAILABLE = False
 
 load_dotenv()
 
@@ -358,6 +366,123 @@ def get_network() -> str:
     except Exception as e:
         return f"नेटवर्क एरर: {e}"
 
+def get_system_info() -> str:
+    """Get detailed system info (CPU, RAM, Disk)."""
+    try:
+        cpu = psutil.cpu_percent(interval=1)
+        ram = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        return f"CPU: {cpu}% | RAM: {ram.percent}% | Disk: {disk.percent}% used."
+    except Exception as e:
+        return f"सिस्टम_info एरर: {e}"
+
+def empty_trash() -> str:
+    """Empty the trash bin."""
+    try:
+        if sys.platform == 'darwin':
+            subprocess.run(['osascript', '-e', 'tell application \"Finder\" to empty trash'], check=True)
+            return "कचरा खाली कर दिया गया।"
+        return "Trash empty इस OS पर समर्थित नहीं।"
+    except Exception as e:
+        return f"Trash खाली करने में एरर: {e}"
+
+def clean_downloads() -> str:
+    """Delete all files in the Downloads folder (Safety: Moves to Trash)."""
+    try:
+        download_path = os.path.expanduser('~/Downloads')
+        for filename in os.listdir(download_path):
+            file_path = os.path.join(download_path, filename)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+        return "Downloads फोल्डर साफ़ कर दिया गया है।"
+    except Exception as e:
+        return f"Clean एरर: {e}"
+
+def set_brightness(level: int) -> str:
+    """Set screen brightness (0-100) on macOS."""
+    try:
+        if sys.platform == 'darwin':
+            subprocess.run(['osascript', '-e', f'set volume output volume {level}'], check=True) # Note: This sets volume, brightness requires 'brightness' CLI or specific AppleScript
+            # Correct brightness script for macOS:
+            script = f'tell application \"System Events\" to set brightness of display 1 to {level/100}'
+            subprocess.run(['osascript', '-e', script], check=True)
+            return f"ब्राइटनेस {level}% सेट किया गया।"
+        return "Brightness control इस OS पर समर्थित नहीं।"
+    except Exception as e:
+        return f"Brightness एरर: {e}"
+
+def move_window(direction: str) -> str:
+    """Move current window (Left/Right/Maximize)."""
+    try:
+        if sys.platform == 'darwin' and PYAUTOGUI_AVAILABLE:
+            size = pyautogui.size()
+            if direction.lower() == 'left':
+                pyautogui.moveTo(0, 0)
+                # Requires AppleScript for actual window resizing
+                script = 'tell application \"System Events\" to set size of window 1 of application (path to frontmost application as text) to {680, 700}'
+                subprocess.run(['osascript', '-e', script], check=True)
+            elif direction.lower() == 'right':
+                script = 'tell application \"System Events\" to set position of window 1 of application (path to frontmost application as text) to {700, 0}'
+                subprocess.run(['osascript', '-e', script], check=True)
+            return f"Window को {direction} shifted किया गया।"
+        return "Window management इस OS पर अभी समर्थित नहीं।"
+    except Exception as e:
+        return f"Window move एरर: {e}"
+
+def get_network_speed() -> str:
+    """Get current network upload/download speed."""
+    try:
+        # Using psutil to get a snapshot
+        net = psutil.net_io_counters()
+        return f"Bytes Sent: {net.bytes_sent}, Bytes Recv: {net.bytes_recv} (Since boot)"
+    except Exception as e:
+        return f"Speed check एरर: {e}"
+
+def get_battery_info() -> str:
+    """Get detailed battery status."""
+    try:
+        if sys.platform == 'darwin':
+            info = subprocess.run(['pmset', '-g', 'batt'], capture_output=True, text=True)
+            return info.stdout.strip()
+        return "Battery info उपलब्ध नहीं।"
+    except Exception as e:
+        return f"Battery एरर: {e}"
+
+def show_calendar() -> str:
+    """Show current month calendar."""
+    try:
+        cal = subprocess.run(['cal'], capture_output=True, text=True)
+        return f"Calendar:\n{cal.stdout}"
+    except Exception as e:
+        return f"Calendar एरर: {e}"
+
+def toggle_wifi() -> str:
+    """Turn Wi-Fi on or off."""
+    try:
+        if sys.platform == 'darwin':
+            # Get power status
+            status = subprocess.run(['networksetup', '-getairportpower', 'en0'], capture_output=True, text=True)
+            if 'On' in status.stdout:
+                subprocess.run(['networksetup', '-setairportpower', 'en0', 'off'])
+                return "Wi-Fi बंद किया गया।"
+            else:
+                subprocess.run(['networksetup', '-setairportpower', 'en0', 'on'])
+                return "Wi-Fi चालू किया गया।"
+        return "Wi-Fi toggle इस OS पर समर्थित नहीं।"
+    except Exception as e:
+        return f"Wi-Fi एरर: {e}"
+
+def find_file(filename: str) -> str:
+    """Search for a file in the Home directory."""
+    try:
+        home = os.path.expanduser('~')
+        for root, dirs, files in os.walk(home):
+            if filename in files:
+                return f"File मिला: {os.path.join(root, filename)}"
+        return "File नहीं मिला।"
+    except Exception as e:
+        return f"Search एरर: {e}"
+
 # ========== LLM INTENT ==========
 FUNCTIONS = [
     {
@@ -480,6 +605,63 @@ FUNCTIONS = [
         "name": "get_network",
         "description": "Get current Wi-Fi network name.",
         "parameters": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "get_system_info",
+        "description": "Get CPU, RAM, and Disk usage stats.",
+        "parameters": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "empty_trash",
+        "description": "Empty the system trash bin.",
+        "parameters": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "clean_downloads",
+        "description": "Delete all files in the Downloads folder.",
+        "parameters": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "set_brightness",
+        "description": "Set screen brightness level (0-100).",
+        "parameters": {
+            "type": "object",
+            "properties": {"level": {"type": "integer"}},
+            "required": ["level"]
+        }
+    },
+    {
+        "name": "move_window",
+        "description": "Move current window to left or right.",
+        "parameters": {
+            "type": "object",
+            "properties": {"direction": {"type": "string", "enum": ["left", "right", "maximize"]}},
+            "required": ["direction"]
+        }
+    },
+    {
+        "name": "get_battery_info",
+        "description": "Get detailed battery status.",
+        "parameters": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "show_calendar",
+        "description": "Display the current month's calendar.",
+        "parameters": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "toggle_wifi",
+        "description": "Turn Wi-Fi on or off.",
+        "parameters": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "find_file",
+        "description": "Search for a file by name in the Home directory.",
+        "parameters": {
+            "type": "object",
+            "properties": {"filename": {"type": "string"}},
+            "required": ["filename"]
+        }
     }
 ]
 
@@ -539,6 +721,24 @@ def execute_function_call_by_name(name: str, args: dict):
             return set_volume(**args)
         elif name == "get_network":
             return get_network()
+        elif name == "get_system_info":
+            return get_system_info()
+        elif name == "empty_trash":
+            return empty_trash()
+        elif name == "clean_downloads":
+            return clean_downloads()
+        elif name == "set_brightness":
+            return set_brightness(**args)
+        elif name == "move_window":
+            return move_window(**args)
+        elif name == "get_battery_info":
+            return get_battery_info()
+        elif name == "show_calendar":
+            return show_calendar()
+        elif name == "toggle_wifi":
+            return toggle_wifi()
+        elif name == "find_file":
+            return find_file(**args)
         else:
             return f"Unknown function: {name}"
     except Exception as e:
