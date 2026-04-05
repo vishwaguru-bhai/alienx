@@ -179,6 +179,51 @@ def sleep_computer() -> str:
 def say_hello() -> str:
     return "Hello! I'm AlienX, your voice assistant."
 
+def play_music(genre: str = None, artist: str = None) -> str:
+    """Play random music via AppleScript (macOS) or generic command."""
+    try:
+        if sys.platform == 'darwin':
+            script = '''
+            tell application "Music"
+                if it is not running then launch
+                if (count of tracks) > 0 then
+                    set shuffle enabled to true
+                    play
+                else
+                    return "No music in library."
+                end if
+            end tell
+            '''
+            subprocess.run(['osascript', '-e', script], check=True)
+            return "Playing random music."
+        else:
+            # Linux: try generic player (e.g., spotify, vlc)
+            return "Music control not implemented for this OS."
+    except Exception as e:
+        return f"Could not play music: {e}"
+
+def pause_music() -> str:
+    """Pause music playback."""
+    try:
+        if sys.platform == 'darwin':
+            subprocess.run(['osascript', '-e', 'tell application "Music" to pause'], check=True)
+            return "Music paused."
+        else:
+            return "Not supported on this OS."
+    except Exception as e:
+        return f"Error pausing: {e}"
+
+def next_track() -> str:
+    """Skip to next track."""
+    try:
+        if sys.platform == 'darwin':
+            subprocess.run(['osascript', '-e', 'tell application "Music" to next track'], check=True)
+            return "Skipped to next track."
+        else:
+            return "Not supported on this OS."
+    except Exception as e:
+        return f"Error skipping: {e}"
+
 # ========== LLM INTENT ==========
 FUNCTIONS = [
     {
@@ -205,7 +250,7 @@ FUNCTIONS = [
     },
     {
         "name": "execute_shell",
-        "description": "Run a shell command on the computer. Use for custom tasks like listing files, checking processes.",
+        "description": "Run a shell command on the computer. Use for custom tasks like listing files, checking processes, controlling system.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -248,6 +293,28 @@ FUNCTIONS = [
         "name": "say_hello",
         "description": "Greet the user.",
         "parameters": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "play_music",
+        "description": "Play random music or specific genre/artist. Use when user says 'play music', 'bajao', 'random album', etc.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "genre": {"type": "string", "description": "Optional music genre (rock, pop, jazz, etc.)"},
+                "artist": {"type": "string", "description": "Optional artist name"}
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "pause_music",
+        "description": "Pause currently playing music.",
+        "parameters": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "next_track",
+        "description": "Skip to the next track.",
+        "parameters": {"type": "object", "properties": {}}
     }
 ]
 
@@ -257,11 +324,11 @@ def process_text(text: str):
         resp = client.chat.completions.create(
             model=MODEL,
             messages=[
-                {"role": "system", "content": "You are a helpful voice assistant controlling a computer. Use functions for actions. Keep responses concise."},
+                {"role": "system", "content": "You are a voice-controlled AI assistant. Your ONLY job is to call functions to perform actions. NEVER respond with plain text when an action is needed. For ANY command like 'open Chrome', 'play music', 'lock screen', 'what time', 'run ls', you MUST call the appropriate function. Keep responses extremely short (1-2 words) when speaking to user."},
                 {"role": "user", "content": text}
             ],
             functions=FUNCTIONS,
-            function_call="auto"
+            function_call={"name": "any"}  # Force function call
         )
         return resp.choices[0].message
     except Exception as e:
