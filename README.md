@@ -3,13 +3,19 @@
 Voice-controlled PC automation assistant for macOS/Linux.
 
 ## Features
-- Push-to-talk (hotkey) voice commands
-- Open apps, URLs
-- Execute shell commands
-- Get weather, time, running apps
-- Lock screen, sleep
-- Uses OpenRouter free LLMs (Mixtral) + Whisper
-- macOS `say` TTS
+### 🧠 System Control
+- **Hardware:** Battery info, Network status, Brightness control, Volume management.
+- **OS Actions:** Lock screen, Sleep, Empty Trash, Wi-Fi toggle, Calendar view.
+- **Window Mgmt:** Move windows (Left/Right), System stats (CPU/RAM/Disk).
+
+### 🖥️ Desktop & Files
+- **File Ops:** Find files, Clean Downloads folder, Quick search.
+- **Automation:** Open apps/URLs, Execute shell commands, Screenshot capture.
+
+### 🤖 AI & Voice
+- Push-to-talk (hotkey) & Wake word support.
+- Uses OpenRouter free LLMs (Qwen/Mixtral) + Whisper for intent.
+- macOS `say` TTS with Hinglish support.
 
 ## Setup
 
