@@ -18,6 +18,7 @@ import numpy as np
 import tempfile
 import wave
 import sys
+import speech_recognition as sr
 
 load_dotenv()
 
@@ -51,8 +52,8 @@ def save_wav(audio, fs, filename):
         wf.setframerate(fs)
         wf.writeframes(audio.tobytes())
 
-def transcribe_audio(filename):
-    """Transcribe using Whisper via OpenRouter or OpenAI."""
+def transcribe_audio_openrouter(filename):
+    """Transcribe using Whisper via OpenRouter or OpenAI (fallback)."""
     with open(filename, 'rb') as f:
         try:
             resp = client.audio.transcriptions.create(
@@ -63,6 +64,25 @@ def transcribe_audio(filename):
             logger.error(f"Transcription failed: {e}")
             return ""
     return resp.text.strip()
+
+def transcribe_audio(filename):
+    """Transcribe using Google Speech Recognition (free) with fallback to OpenRouter."""
+    try:
+        r = sr.Recognizer()
+        with sr.AudioFile(filename) as source:
+            audio = r.record(source)
+        text = r.recognize_google(audio)
+        logger.info("Transcribed via Google SR")
+        return text.strip()
+    except sr.UnknownValueError:
+        logger.warning("Google SR could not understand audio")
+        return ""
+    except sr.RequestError as e:
+        logger.error(f"Google SR service error: {e}, falling back to OpenRouter")
+        return transcribe_audio_openrouter(filename)
+    except Exception as e:
+        logger.error(f"Transcription error: {e}")
+        return ""
 
 def listen():
     """Record and return transcribed text."""
