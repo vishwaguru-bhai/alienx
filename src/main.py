@@ -84,9 +84,9 @@ def transcribe_audio(filename):
         logger.error(f"Transcription error: {e}")
         return ""
 
-def listen():
-    """Record and return transcribed text."""
-    audio, fs = record_audio()
+def listen(duration=None):
+    """Record and return transcribed text. Duration from args or env."""
+    audio, fs = record_audio(duration)
     with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
         tmp_name = tmp.name
     try:
@@ -446,14 +446,11 @@ def on_activate():
     logger.info("Hotkey activated, listening...")
     threading.Thread(target=run_assistant, daemon=True).start()
 
-def run_assistant():
+def process_and_speak(text: str):
+    """Process a command string and speak the result."""
     try:
-        user_text = listen()
-        if not user_text:
-            speak("Sorry, I didn't catch that.")
-            return
-        logger.info(f"Command: {user_text}")
-        response_msg = process_text(user_text)
+        logger.info(f"Command: {text}")
+        response_msg = process_text(text)
         if not response_msg:
             speak("Sorry, I couldn't process that.")
             return
@@ -481,17 +478,52 @@ def run_assistant():
         logger.exception("Assistant error")
         speak(f"Error: {e}")
 
+def run_assistant():
+    """Hotkey activation: listen once and process."""
+    try:
+        user_text = listen()
+        if not user_text:
+            speak("Sorry, I didn't catch that.")
+            return
+        process_and_speak(user_text)
+    except Exception as e:
+        logger.exception("Assistant error")
+        speak(f"Error: {e}")
+
 def main():
     logger.info("🤖 AlienX voice assistant starting...")
     speak("AlienX online.")
-    hotkey = os.getenv("HOTKEY", "<cmd>+<alt>+j" if sys.platform == 'darwin' else "<ctrl>+<alt>+j")
-    logger.info(f"Press {hotkey} to activate voice command.")
-    try:
-        with keyboard.GlobalHotKeys({hotkey: on_activate}) as h:
-            h.join()
-    except KeyboardInterrupt:
-        logger.info("Shutting down...")
-        sys.exit(0)
+
+    wake_word = os.getenv("WAKE_WORD", "").lower()
+    if wake_word:
+        logger.info(f"Wake word mode enabled. Say '{wake_word}' to activate.")
+        print(f"Say '{wake_word}' to activate... (Press Ctrl+C to exit)")
+        try:
+            while True:
+                # Listen for wake word (short burst)
+                text = listen(duration=1).lower()
+                if wake_word in text:
+                    logger.info("Wake word detected!")
+                    speak("Yes?")
+                    # Now listen for command
+                    cmd = listen(duration=int(os.getenv("COMMAND_DURATION", "3")))
+                    if cmd:
+                        process_and_speak(cmd)
+                    else:
+                        speak("No command heard.")
+        except KeyboardInterrupt:
+            logger.info("Shutting down...")
+            sys.exit(0)
+    else:
+        # Hotkey mode
+        hotkey = os.getenv("HOTKEY", "<cmd>+<alt>+j" if sys.platform == 'darwin' else "<ctrl>+<alt>+j")
+        logger.info(f"Press {hotkey} to activate voice command.")
+        try:
+            with keyboard.GlobalHotKeys({hotkey: on_activate}) as h:
+                h.join()
+        except KeyboardInterrupt:
+            logger.info("Shutting down...")
+            sys.exit(0)
 
 if __name__ == "__main__":
     main()
