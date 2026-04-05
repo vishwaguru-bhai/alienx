@@ -110,10 +110,69 @@ def speak(text):
         logger.error(f"TTS failed: {e}")
 
 # ========== ACTION FUNCTIONS ==========
+# App name mapping for common aliases (macOS)
+APP_ALIASES = {
+    "chrome": "Google Chrome",
+    "google chrome": "Google Chrome",
+    "chromium": "Google Chrome",
+    "safari": "Safari",
+    "firefox": "Firefox",
+    "fire fox": "Firefox",
+    "vscode": "Visual Studio Code",
+    "vs code": "Visual Studio Code",
+    "code": "Visual Studio Code",
+    "visual studio code": "Visual Studio Code",
+    "terminal": "Terminal",
+    "iterm": "iTerm",
+    "iterm2": "iTerm",
+    "finder": "Finder",
+    "spotify": "Spotify",
+    "music": "Music",
+    "photos": "Photos",
+    "mail": "Mail",
+    "messages": "Messages",
+    "calendar": "Calendar",
+    "notes": "Notes",
+    "calculator": "Calculator",
+    "preview": "Preview",
+    "textedit": "TextEdit",
+    "sublime": "Sublime Text",
+    "pycharm": "PyCharm",
+    "idea": "IntelliJ IDEA",
+    "webstorm": "WebStorm",
+    "android studio": "Android Studio",
+    "xcode": "Xcode",
+    "microsoft word": "Microsoft Word",
+    "word": "Microsoft Word",
+    "excel": "Microsoft Excel",
+    "powerpoint": "Microsoft PowerPoint",
+    "ppt": "Microsoft PowerPoint",
+}
+
+def resolve_app_name(app_name: str) -> str:
+    """Map common aliases to actual macOS app names."""
+    key = app_name.lower().strip()
+    # Direct alias match
+    if key in APP_ALIASES:
+        return APP_ALIASES[key]
+    # Try title case (first letters capital)
+    title = app_name.title()
+    if title != app_name:
+        return title
+    # Try adding common suffixes
+    for suffix in ['.app', 'App']:
+        if not app_name.endswith(suffix):
+            candidate = app_name + suffix
+            # Could verify exists, but just return
+            return candidate
+    return app_name
+
 def open_application(app_name: str) -> str:
-    """Open a macOS/Unix application."""
+    """Open a macOS/Unix application with smart name resolution."""
     try:
-        logger.info(f"Attempting to open: {app_name}")
+        original = app_name
+        app_name = resolve_app_name(app_name)
+        logger.info(f"Attempting to open: {app_name} (from '{original}')")
         if sys.platform == 'darwin':
             subprocess.run(['open', '-a', app_name], check=True)
         else:
@@ -121,18 +180,25 @@ def open_application(app_name: str) -> str:
         logger.info(f"Successfully opened {app_name}")
         return f"Opening {app_name}."
     except Exception as e:
-        logger.error(f"Failed to open {app_name}: {e}")
-        return f"Failed to open {app_name}: {e}"
+        logger.error(f"Failed to open {original} (tried {app_name}): {e}")
+        return f"Sorry, I couldn't open {original}. Please check if it's installed."
 
 def open_url(url: str) -> str:
     """Open URL in default browser."""
+    # Clean up common speech artifacts
+    url = url.strip().lower()
+    # If it's just a domain without TLD, add .com as guess
+    if '.' not in url:
+        url = f"{url}.com"
     if not url.startswith(('http://', 'https://')):
         url = 'https://' + url
     try:
+        logger.info(f"Opening URL: {url}")
         subprocess.run(['open', url] if sys.platform == 'darwin' else ['xdg-open', url], check=True)
         return f"Opening {url}."
     except Exception as e:
-        return f"Failed to open URL: {e}"
+        logger.error(f"Failed to open URL {url}: {e}")
+        return f"Failed to open {url}."
 
 def execute_shell(command: str) -> str:
     """Execute a shell command and return output."""
