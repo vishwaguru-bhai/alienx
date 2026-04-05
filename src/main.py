@@ -113,12 +113,15 @@ def speak(text):
 def open_application(app_name: str) -> str:
     """Open a macOS/Unix application."""
     try:
+        logger.info(f"Attempting to open: {app_name}")
         if sys.platform == 'darwin':
             subprocess.run(['open', '-a', app_name], check=True)
         else:
             subprocess.run(['xdg-open', app_name], check=True)
+        logger.info(f"Successfully opened {app_name}")
         return f"Opening {app_name}."
     except Exception as e:
+        logger.error(f"Failed to open {app_name}: {e}")
         return f"Failed to open {app_name}: {e}"
 
 def open_url(url: str) -> str:
@@ -183,23 +186,23 @@ def play_music(genre: str = None, artist: str = None) -> str:
     """Play random music via AppleScript (macOS) or generic command."""
     try:
         if sys.platform == 'darwin':
+            # Simple script: launch Music and play
             script = '''
             tell application "Music"
-                if it is not running then launch
-                if (count of tracks) > 0 then
-                    set shuffle enabled to true
-                    play
-                else
-                    return "No music in library."
-                end if
+                activate
+                play
             end tell
             '''
-            subprocess.run(['osascript', '-e', script], check=True)
+            result = subprocess.run(['osascript', '-e', script], capture_output=True, text=True, check=True)
+            logger.info(f"Music script output: {result.stdout.strip()}")
             return "Playing random music."
         else:
-            # Linux: try generic player (e.g., spotify, vlc)
             return "Music control not implemented for this OS."
+    except subprocess.CalledProcessError as e:
+        logger.error(f"AppleScript error: {e.stderr}")
+        return f"Could not play music: {e.stderr}"
     except Exception as e:
+        logger.exception("play_music failed")
         return f"Could not play music: {e}"
 
 def pause_music() -> str:
@@ -383,6 +386,11 @@ def run_assistant():
         if not response_msg:
             speak("Sorry, I couldn't process that.")
             return
+        # DEBUG: print function call details
+        if response_msg.function_call:
+            logger.info(f"FUNCTION CALL: {response_msg.function_call.name} args={response_msg.function_call.arguments}")
+        else:
+            logger.info(f"NO FUNCTION CALL; content: {response_msg.content}")
         result = execute_function_call(response_msg)
         speak(result)
     except Exception as e:
