@@ -18,6 +18,7 @@ import numpy as np
 import tempfile
 import wave
 import sys
+import time
 import speech_recognition as sr
 
 load_dotenv()
@@ -37,9 +38,9 @@ MODEL = os.getenv("MODEL", "openrouter/auto")
 
 # ========== AUDIO ==========
 def record_audio(duration=None, fs=16000):
-    """Record audio from microphone. Duration from env or default 5s."""
+    """Record audio from microphone. Duration from args or env."""
     if duration is None:
-        duration = int(os.getenv("RECORD_DURATION", "5"))
+        duration = int(os.getenv("RECORD_DURATION", "3"))
     logger.info("Listening...")
     audio = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype='int16')
     sd.wait()
@@ -85,7 +86,9 @@ def transcribe_audio(filename):
         return ""
 
 def listen(duration=None):
-    """Record and return transcribed text. Duration from args or env."""
+    """Record and return transcribed text."""
+    if duration is None:
+        duration = int(os.getenv("RECORD_DURATION", "3"))
     audio, fs = record_audio(duration)
     with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
         tmp_name = tmp.name
@@ -117,8 +120,7 @@ def speak(text):
     except Exception as e:
         logger.error(f"TTS failed: {e}")
 
-# ========== ACTION FUNCTIONS ==========
-# App name mapping for common aliases (macOS)
+# ========== APP NAME RESOLUTION ==========
 APP_ALIASES = {
     "chrome": "Google Chrome",
     "google chrome": "Google Chrome",
@@ -160,21 +162,18 @@ APP_ALIASES = {
 def resolve_app_name(app_name: str) -> str:
     """Map common aliases to actual macOS app names."""
     key = app_name.lower().strip()
-    # Direct alias match
     if key in APP_ALIASES:
         return APP_ALIASES[key]
-    # Try title case (first letters capital)
     title = app_name.title()
     if title != app_name:
         return title
-    # Try adding common suffixes
     for suffix in ['.app', 'App']:
         if not app_name.endswith(suffix):
             candidate = app_name + suffix
-            # Could verify exists, but just return
             return candidate
     return app_name
 
+# ========== ACTION FUNCTIONS ==========
 def open_application(app_name: str) -> str:
     """Open a macOS/Unix application with smart name resolution."""
     try:
@@ -193,9 +192,7 @@ def open_application(app_name: str) -> str:
 
 def open_url(url: str) -> str:
     """Open URL in default browser."""
-    # Clean up common speech artifacts
     url = url.strip().lower()
-    # If it's just a domain without TLD, add .com as guess
     if '.' not in url:
         url = f"{url}.com"
     if not url.startswith(('http://', 'https://')):
@@ -248,7 +245,7 @@ def lock_screen() -> str:
     return "स्क्रीिन लॉक हो गई।"
 
 def sleep_computer() -> str:
-    """Put computer to sleep."""
+    """Put the computer to sleep."""
     if sys.platform == 'darwin':
         subprocess.run(['pmset', 'sleepnow'])
     else:
@@ -259,10 +256,9 @@ def say_hello() -> str:
     return "नमस्ते! मैं AlienX हूँ, आपका वॉयस असिस्टेंट।"
 
 def play_music(genre: str = None, artist: str = None) -> str:
-    """Play random music via AppleScript (macOS) or generic command."""
+    """Play random music via AppleScript (macOS)."""
     try:
         if sys.platform == 'darwin':
-            # Simple script: launch Music and play
             script = '''
             tell application "Music"
                 activate
@@ -302,6 +298,65 @@ def next_track() -> str:
             return "Not supported on this OS."
     except Exception as e:
         return f"नेक्स्ट में त्रुटि: {e}"
+
+def get_battery() -> str:
+    """Get battery status (macOS)."""
+    try:
+        if sys.platform == 'darwin':
+            info = subprocess.run(['pmset', '-g', 'batt'], capture_output=True, text=True)
+            lines = info.stdout.strip().split('\n')
+            if lines:
+                return f"बैटरी: {lines[1] if len(lines)>1 else lines[0]}"
+        return "बैटरी जानकारी उपलब्ध नहीं।"
+    except Exception as e:
+        return f"बैटरी एरर: {e}"
+
+def get_system_stats() -> str:
+    """Get system uptime and memory."""
+    try:
+        if sys.platform == 'darwin':
+            uptime = subprocess.run(['uptime'], capture_output=True, text=True).stdout.strip()
+            mem = subprocess.run(['vm_stat'], capture_output=True, text=True).stdout.strip().split('\n')[0]
+            return f"ऑपनटाइम: {uptime}\nमेमोरी: {mem}"
+        return "सिस्टम जानकारी इस ऑएस पर समर्थित नहीं।"
+    except Exception as e:
+        return f"सिस्टम स्टैट्स एरर: {e}"
+
+def take_screenshot() -> str:
+    """Take screenshot and save to desktop."""
+    try:
+        if sys.platform == 'darwin':
+            desktop = os.path.expanduser('~/Desktop')
+            filename = f"screenshot_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            path = os.path.join(desktop, filename)
+            subprocess.run(['screencapture', '-x', path], check=True)
+            return f"स्क्रीनशॉट लिया गया: {path}"
+        return "स्क्रीनशॉट इस ऑएस पर समर्थित नहीं।"
+    except Exception as e:
+        return f"स्क्रीनशॉट एरर: {e}"
+
+def set_volume(level: int = 50) -> str:
+    """Set system volume (0-100)."""
+    try:
+        if sys.platform == 'darwin':
+            subprocess.run(['osascript', '-e', f'set volume output volume {level}'], check=True)
+            return f"वॉल्यूम सेट किया: {level}%"
+        return "वॉल्यूम कंट्रोल इस ऑएस पर समर्थित नहीं।"
+    except Exception as e:
+        return f"वॉल्यूम एरर: {e}"
+
+def get_network() -> str:
+    """Get current Wi-Fi network name."""
+    try:
+        if sys.platform == 'darwin':
+            net = subprocess.run(['networksetup', '-getairportnetwork', 'en0'], capture_output=True, text=True)
+            if net.returncode == 0:
+                return f"Wi-Fi: {net.stdout.strip()}"
+            else:
+                return "Wi-Fi नेटवर्क नहीं मिल रहा।"
+        return "नेटवर्क जानकारी इस ऑएस पर समर्थित नहीं।"
+    except Exception as e:
+        return f"नेटवर्क एरर: {e}"
 
 # ========== LLM INTENT ==========
 FUNCTIONS = [
@@ -394,13 +449,43 @@ FUNCTIONS = [
         "name": "next_track",
         "description": "Skip to the next track.",
         "parameters": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "get_battery",
+        "description": "Get battery status and charge level.",
+        "parameters": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "get_system_stats",
+        "description": "Get system uptime and memory info.",
+        "parameters": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "take_screenshot",
+        "description": "Take a screenshot and save to desktop.",
+        "parameters": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "set_volume",
+        "description": "Set system volume (0-100).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "level": {"type": "integer", "description": "Volume level 0-100"}
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "get_network",
+        "description": "Get current Wi-Fi network name.",
+        "parameters": {"type": "object", "properties": {}}
     }
 ]
 
 def process_text(text: str):
     """Send text to LLM with tool definitions; return message with possible tool_calls."""
     try:
-        # Convert FUNCTIONS to OpenAI tools format
         tools = [{"type": "function", "function": f} for f in FUNCTIONS]
         resp = client.chat.completions.create(
             model=MODEL,
@@ -441,20 +526,24 @@ def execute_function_call_by_name(name: str, args: dict):
         elif name == "play_music":
             return play_music(**args)
         elif name == "pause_music":
-            return pause_music(**args)
+            return pause_music()
         elif name == "next_track":
-            return next_track(**args)
+            return next_track()
+        elif name == "get_battery":
+            return get_battery()
+        elif name == "get_system_stats":
+            return get_system_stats()
+        elif name == "take_screenshot":
+            return take_screenshot()
+        elif name == "set_volume":
+            return set_volume(**args)
+        elif name == "get_network":
+            return get_network()
         else:
             return f"Unknown function: {name}"
     except Exception as e:
         logger.error(f"Execution error: {e}")
         return f"Error executing {name}: {e}"
-
-# ========== HOTKEY & MAIN ==========
-def on_activate():
-    """Hotkey pressed — start listening."""
-    logger.info("Hotkey activated, listening...")
-    threading.Thread(target=run_assistant, daemon=True).start()
 
 def process_and_speak(text: str):
     """Process a command string and speak the result."""
@@ -465,16 +554,14 @@ def process_and_speak(text: str):
             speak("Sorry, I couldn't process that.")
             return
 
-        # Check for tool_calls (OpenAI v1 style)
         if response_msg.tool_calls:
-            tool_call = response_msg.tool_calls[0]  # use first
+            tool_call = response_msg.tool_calls[0]
             name = tool_call.function.name
             args = json.loads(tool_call.function.arguments) if tool_call.function.arguments else {}
             logger.info(f"TOOL CALL: {name} args={args}")
             result = execute_function_call_by_name(name, args)
             speak(result)
         elif response_msg.function_call:
-            # Legacy fallback
             name = response_msg.function_call.name
             args = json.loads(response_msg.function_call.arguments) if response_msg.function_call.arguments else {}
             logger.info(f"FUNCTION CALL (legacy): {name} args={args}")
@@ -502,7 +589,7 @@ def run_assistant():
 
 def main():
     logger.info("🤖 AlienX voice assistant starting...")
-    speak("AlienX online.")
+    speak("नमस्ते! मैं AlienX हूँ, आपका वॉयस असिस्टेंट।")
 
     wake_word = os.getenv("WAKE_WORD", "").lower()
     if wake_word:
@@ -510,17 +597,18 @@ def main():
         print(f"Say '{wake_word}' to activate... (Press Ctrl+C to exit)")
         try:
             while True:
-                # Listen for wake word (short burst)
-                text = listen(duration=1).lower()
+                ww_duration = int(os.getenv("WAKE_WORD_DURATION", "2"))
+                text = listen(duration=ww_duration).lower()
                 if wake_word in text:
                     logger.info("Wake word detected!")
                     speak("Yes?")
-                    # Now listen for command
                     cmd = listen(duration=int(os.getenv("COMMAND_DURATION", "3")))
                     if cmd:
                         process_and_speak(cmd)
                     else:
                         speak("No command heard.")
+                    # Debounce: prevent immediate re-trigger
+                    time.sleep(2)
         except KeyboardInterrupt:
             logger.info("Shutting down...")
             sys.exit(0)
