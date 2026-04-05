@@ -322,27 +322,26 @@ FUNCTIONS = [
 ]
 
 def process_text(text: str):
-    """Send text to LLM with function definitions; return function call or text response."""
+    """Send text to LLM with tool definitions; return message with possible tool_calls."""
     try:
+        # Convert FUNCTIONS to OpenAI tools format
+        tools = [{"type": "function", "function": f} for f in FUNCTIONS]
         resp = client.chat.completions.create(
             model=MODEL,
             messages=[
                 {"role": "system", "content": "You are a voice-controlled AI assistant. Your ONLY job is to call functions to perform actions. NEVER respond with plain text when an action is needed. For ANY command like 'open Chrome', 'play music', 'lock screen', 'what time', 'run ls', you MUST call the appropriate function. Keep responses extremely short (1-2 words) when speaking to user."},
                 {"role": "user", "content": text}
             ],
-            functions=FUNCTIONS,
-            function_call={"name": "any"}  # Force function call
+            tools=tools,
+            tool_choice="auto"
         )
         return resp.choices[0].message
     except Exception as e:
         logger.error(f"LLM error: {e}")
         return None
 
-def execute_function_call(msg):
-    if not msg or not msg.function_call:
-        return msg.content if msg else "I didn't understand."
-    name = msg.function_call.name
-    args = json.loads(msg.function_call.arguments) if msg.function_call.arguments else {}
+def execute_function_call_by_name(name: str, args: dict):
+    """Execute a function given its name and arguments dict."""
     logger.info(f"Executing: {name} with {args}")
     try:
         if name == "open_application":
@@ -363,6 +362,12 @@ def execute_function_call(msg):
             return sleep_computer()
         elif name == "say_hello":
             return say_hello()
+        elif name == "play_music":
+            return play_music(**args)
+        elif name == "pause_music":
+            return pause_music(**args)
+        elif name == "next_track":
+            return next_track(**args)
         else:
             return f"Unknown function: {name}"
     except Exception as e:
@@ -386,13 +391,26 @@ def run_assistant():
         if not response_msg:
             speak("Sorry, I couldn't process that.")
             return
-        # DEBUG: print function call details
-        if response_msg.function_call:
-            logger.info(f"FUNCTION CALL: {response_msg.function_call.name} args={response_msg.function_call.arguments}")
+
+        # Check for tool_calls (OpenAI v1 style)
+        if response_msg.tool_calls:
+            tool_call = response_msg.tool_calls[0]  # use first
+            name = tool_call.function.name
+            args = json.loads(tool_call.function.arguments) if tool_call.function.arguments else {}
+            logger.info(f"TOOL CALL: {name} args={args}")
+            result = execute_function_call_by_name(name, args)
+            speak(result)
+        elif response_msg.function_call:
+            # Legacy fallback
+            name = response_msg.function_call.name
+            args = json.loads(response_msg.function_call.arguments) if response_msg.function_call.arguments else {}
+            logger.info(f"FUNCTION CALL (legacy): {name} args={args}")
+            result = execute_function_call_by_name(name, args)
+            speak(result)
         else:
-            logger.info(f"NO FUNCTION CALL; content: {response_msg.content}")
-        result = execute_function_call(response_msg)
-        speak(result)
+            content = response_msg.content or "I'm not sure how to do that."
+            logger.info(f"NO TOOL CALL; content: {content}")
+            speak(content)
     except Exception as e:
         logger.exception("Assistant error")
         speak(f"Error: {e}")
