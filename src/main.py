@@ -99,11 +99,19 @@ def listen(duration=None):
 
 # ========== TTS ==========
 def speak(text):
-    """Speak using macOS 'say' or espeak on Linux."""
+    """Speak using macOS 'say' with custom voice/speed, or espeak on Linux."""
     logger.info(f"Speaking: {text}")
     try:
+        voice = os.getenv("VOICE", "")
+        rate = os.getenv("RATE", "")
         if sys.platform == 'darwin':
-            subprocess.run(['say', text])
+            args = ['say']
+            if voice:
+                args.extend(['-v', voice])
+            if rate:
+                args.extend(['-r', rate])
+            args.append(text)
+            subprocess.run(args, check=True)
         else:
             subprocess.run(['espeak', text])
     except Exception as e:
