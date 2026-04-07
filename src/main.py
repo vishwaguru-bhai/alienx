@@ -58,21 +58,26 @@ def main():
                         logger.info("Wake word detected! Activating...")
                         speak("Haan boss?")
                         last_active = time.time()
-                        continue # Wait for next loop for command to avoid cutting audio
+                        time.sleep(0.5) # Chhota sa pause taaki echo na aaye
+                        continue 
                     
                     # Process Command
-                    if WAKE_WORD in text:
-                        # If wake word is part of the command, we might need to re-listen or process
-                        speak("Haan boss?")
-                        text = listen(duration=int(os.getenv("COMMAND_DURATION", "4"))).lower()
-                        last_active = time.time()
+                    if WAKE_WORD in text and not is_active:
+                        # Agar wake word abhi detect hua hai, toh command ke liye thoda wait karo
+                        time.sleep(0.5)
+                        
+                    # Agar active window mein hain ya abhi wake hua hai
+                    cmd_duration = int(os.getenv("COMMAND_DURATION", "4"))
+                    command_text = listen(duration=cmd_duration).lower()
                     
-                    if text:
-                        logger.info(f"Processing: {text}")
-                        process_and_speak(text, speak)
+                    if command_text:
+                        logger.info(f"Processing: {command_text}")
+                        process_and_speak(command_text, speak)
                         last_active = time.time() # Reset timer on interaction
                     else:
-                        logger.info("No command heard in active window.")
+                        if is_active:
+                            logger.info("No command heard in active window. Going to sleep.")
+                        last_active = time.time() - (ACTIVE_TIMEOUT + 10) # Force sleep if wake word failed
 
         except KeyboardInterrupt:
             logger.info("Shutting down...")
