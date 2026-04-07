@@ -54,34 +54,34 @@ def main():
 
                 # Wake word detection or Active Window Logic
                 if WAKE_WORD in text or is_active:
+                    # Case 1: Wake Word Detected (Sleep -> Active)
                     if WAKE_WORD in text and not is_active:
                         logger.info("Wake word detected! Activating...")
                         speak("Haan boss?")
                         last_active = time.time()
-                        time.sleep(0.5) # Chhota sa pause taaki echo na aaye
-                        continue 
+                        time.sleep(0.5) 
+                        continue # Loop ghumaao taaki next listening command pakde
                     
-                    # Process Command
-                    if WAKE_WORD in text and not is_active:
-                        # Agar wake word abhi detect hua hai, toh command ke liye thoda wait karo
-                        time.sleep(0.5)
-                        
-                    # Agar active window mein hain ya abhi wake hua hai
-                    cmd_duration = int(os.getenv("COMMAND_DURATION", "4"))
-                    command_text = listen(duration=cmd_duration).lower()
+                    # Case 2: Active Window Logic (Already Awake)
+                    # Agar text mein wake word tha aur hum already active hain, toh usi text ko command maano
+                    final_command = text if (WAKE_WORD in text and is_active) else ""
                     
-                    if command_text:
-                        logger.info(f"Processing Command: {command_text}")
+                    # Agar text khali hai (sirf active window chal rahi hai), toh naya listen karo
+                    if not final_command:
+                        cmd_duration = int(os.getenv("COMMAND_DURATION", "4"))
+                        final_command = listen(duration=cmd_duration).lower()
+
+                    if final_command:
+                        logger.info(f"Processing Command: {final_command}")
                         try:
-                            process_and_speak(command_text, speak)
+                            process_and_speak(final_command, speak)
                         except Exception as e:
                             logger.error(f"Failed to process command: {e}")
                             speak("Kuch gadbad ho gayi boss.")
                         last_active = time.time() # Reset timer on interaction
                     else:
-                        logger.info("Empty command received.")
-                        if not (WAKE_WORD in text and not is_active):
-                            last_active = time.time() - (ACTIVE_TIMEOUT + 10) # Force sleep
+                        logger.info("No command heard. Going to sleep.")
+                        last_active = time.time() - (ACTIVE_TIMEOUT + 10)
 
         except KeyboardInterrupt:
             logger.info("Shutting down...")
