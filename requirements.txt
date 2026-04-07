@@ -10,3 +10,4 @@ pyobjc-framework-Quartz>=10.0; sys_platform == 'darwin'
 psutil>=5.9.0
 pyautogui>=0.9.54
 requests>=2.31.0
+edge-tts>=6.1.9

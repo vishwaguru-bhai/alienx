@@ -32,23 +32,22 @@ def on_activate():
 
 def main():
     logger.info("🤖 AlienX voice assistant starting...")
-    speak("Namaste! Main AlienX hoon.")
+    speak("Friday aapki seva me hazir hai sir.")
     ACTIVE_TIMEOUT = 15  # seconds to stay awake after interaction
 
     if WAKE_WORD:
         logger.info(f"Smart Wake mode enabled. Say '{WAKE_WORD}' to activate.")
         print(f"Say '{WAKE_WORD}' to activate... (Press Ctrl+C to exit)")
         try:
+            last_active = time.time() - (ACTIVE_TIMEOUT + 10)  # Start in sleep mode
             while True:
-                last_active = time.time() - (ACTIVE_TIMEOUT + 10)  # Start in sleep mode
-                
                 # Check if we should listen for wake word or command
                 current_time = time.time()
                 is_active = (current_time - last_active) < ACTIVE_TIMEOUT
-                
+
                 duration = 2 if is_active else int(os.getenv("WAKE_WORD_DURATION", "2"))
                 text = listen(duration=duration).lower()
-                
+
                 if not text:
                     continue
 
@@ -59,14 +58,13 @@ def main():
                         logger.info("Wake word detected! Activating...")
                         speak("Haan boss?")
                         last_active = time.time()
-                        time.sleep(0.5) 
+                        time.sleep(0.5)
                         continue # Loop ghumaao taaki next listening command pakde
-                    
-                    # Case 2: Active Window Logic (Already Awake)
-                    # Agar text mein wake word tha aur hum already active hain, toh usi text ko command maano
-                    final_command = text if (WAKE_WORD in text and is_active) else ""
-                    
-                    # Agar text khali hai (sirf active window chal rahi hai), toh naya listen karo
+
+                    # Case 2: Active Window (Already Awake)
+                    # Agar text mein sirf wake word tha aur already active hain, toh naya command suno
+                    final_command = text.replace(WAKE_WORD, "").strip() if WAKE_WORD in text else text
+
                     if not final_command:
                         logger.info("Active window: Waiting for command...")
                         cmd_duration = int(os.getenv("COMMAND_DURATION", "4"))
