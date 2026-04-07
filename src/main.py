@@ -71,13 +71,17 @@ def main():
                     command_text = listen(duration=cmd_duration).lower()
                     
                     if command_text:
-                        logger.info(f"Processing: {command_text}")
-                        process_and_speak(command_text, speak)
+                        logger.info(f"Processing Command: {command_text}")
+                        try:
+                            process_and_speak(command_text, speak)
+                        except Exception as e:
+                            logger.error(f"Failed to process command: {e}")
+                            speak("Kuch gadbad ho gayi boss.")
                         last_active = time.time() # Reset timer on interaction
                     else:
-                        if is_active:
-                            logger.info("No command heard in active window. Going to sleep.")
-                        last_active = time.time() - (ACTIVE_TIMEOUT + 10) # Force sleep if wake word failed
+                        logger.info("Empty command received.")
+                        if not (WAKE_WORD in text and not is_active):
+                            last_active = time.time() - (ACTIVE_TIMEOUT + 10) # Force sleep
 
         except KeyboardInterrupt:
             logger.info("Shutting down...")
