@@ -68,10 +68,12 @@ def main():
                     
                     # Agar text khali hai (sirf active window chal rahi hai), toh naya listen karo
                     if not final_command:
+                        logger.info("Active window: Waiting for command...")
                         cmd_duration = int(os.getenv("COMMAND_DURATION", "4"))
                         final_command = listen(duration=cmd_duration).lower()
+                        logger.info(f"Raw Command Received: '{final_command}'")
 
-                    if final_command:
+                    if final_command and len(final_command) > 2:
                         logger.info(f"Processing Command: {final_command}")
                         try:
                             process_and_speak(final_command, speak)
@@ -80,7 +82,7 @@ def main():
                             speak("Kuch gadbad ho gayi boss.")
                         last_active = time.time() # Reset timer on interaction
                     else:
-                        logger.info("No command heard. Going to sleep.")
+                        logger.info(f"Empty or too short command ('{final_command}'). Going to sleep.")
                         last_active = time.time() - (ACTIVE_TIMEOUT + 10)
 
         except KeyboardInterrupt:
