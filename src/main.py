@@ -33,23 +33,47 @@ def on_activate():
 def main():
     logger.info("🤖 AlienX voice assistant starting...")
     speak("Namaste! Main AlienX hoon.")
+    ACTIVE_TIMEOUT = 15  # seconds to stay awake after interaction
 
     if WAKE_WORD:
-        logger.info(f"Wake word mode enabled. Say '{WAKE_WORD}' to activate.")
+        logger.info(f"Smart Wake mode enabled. Say '{WAKE_WORD}' to activate.")
         print(f"Say '{WAKE_WORD}' to activate... (Press Ctrl+C to exit)")
         try:
             while True:
-                ww_duration = int(os.getenv("WAKE_WORD_DURATION", "2"))
-                text = listen(duration=ww_duration).lower()
-                if WAKE_WORD in text:
-                    logger.info("Wake word detected!")
-                    speak("Yes?")
-                    cmd = listen(duration=int(os.getenv("COMMAND_DURATION", "3")))
-                    if cmd:
-                        process_and_speak(cmd, speak)
+                last_active = time.time() - (ACTIVE_TIMEOUT + 10)  # Start in sleep mode
+                
+                # Check if we should listen for wake word or command
+                current_time = time.time()
+                is_active = (current_time - last_active) < ACTIVE_TIMEOUT
+                
+                duration = 2 if is_active else int(os.getenv("WAKE_WORD_DURATION", "2"))
+                text = listen(duration=duration).lower()
+                
+                if not text:
+                    continue
+
+                # Wake word detection or Active Window Logic
+                if WAKE_WORD in text or is_active:
+                    if WAKE_WORD in text and not is_active:
+                        logger.info("Wake word detected! Activating...")
+                        speak("Haan boss?")
+                        last_active = time.time()
+                        continue # Wait for next loop for command to avoid cutting audio
+                    
+                    # Process Command
+                    if WAKE_WORD in text:
+                        # If wake word is part of the command, we might need to re-listen or process
+                        speak("Haan boss?")
+                        text = listen(duration=int(os.getenv("COMMAND_DURATION", "4"))).lower()
+                        last_active = time.time()
+                    
+                    if text:
+                        logger.info(f"Processing: {text}")
+                        process_and_speak(text, speak)
+                        last_active = time.time() # Reset timer on interaction
                     else:
-                        speak("No command heard.")
-                    time.sleep(2)
+                        logger.info("No command heard in active window.")
+
         except KeyboardInterrupt:
             logger.info("Shutting down...")
             sys.exit(0)
